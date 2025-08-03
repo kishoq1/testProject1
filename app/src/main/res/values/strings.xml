@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">testProject</string>
+    <string name="playback_channel_name">Kênh phát nhạc</string>
+    <string name="playback_channel_description">Hiển thị thông báo khi đang phát nhạc</string>
+</resources>
