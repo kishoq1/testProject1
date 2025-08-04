@@ -92,7 +92,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.v180)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.recyclerview)
-    implementation(libs.androidx.media3.ui.v180)
+
 
 
 
@@ -108,5 +108,9 @@ dependencies {
     debugImplementation(libs.debug.androidx.ui.test.manifest)
 
     implementation(project(":nanojson"))
+    implementation(libs.guava)
+    implementation(libs.errorprone.annotations)
+    implementation("androidx.media3:media3-common:1.3.1")
+
 
 }
