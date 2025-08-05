@@ -1,14 +1,13 @@
 package com.example.testproject.ui.screen
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.testproject.VideoList // <-- Thêm import này
+import com.example.testproject.VideoList
 import com.example.testproject.model.Video
 import com.example.testproject.model.VideoSearchViewModel
 
@@ -41,9 +40,6 @@ fun VideoSearchScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- THAY ĐỔI QUAN TRỌNG Ở ĐÂY ---
-        // Sử dụng `VideoList` đã được thiết kế sẵn để hiển thị kết quả.
-        // `VideoList` sẽ tự động hiển thị cả ảnh bìa và tiêu đề.
         VideoList(videos = searchResults, onVideoClick = onVideoClick)
     }
 }

@@ -9,8 +9,6 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
 object VideoRepository {
 
-    // XÓA KHỐI INIT Ở ĐÂY
-
     suspend fun searchVideos(query: String): List<Video> = withContext(Dispatchers.IO) {
         if (query.isBlank()) {
             return@withContext emptyList()

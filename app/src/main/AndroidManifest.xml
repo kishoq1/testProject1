@@ -30,7 +30,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ui.VideoPlayerActivity" />
+        <activity android:name=".ui.VideoPlayerActivity"
+            android:launchMode="singleTop" />
 
         <service
             android:name=".service.PlaybackService"

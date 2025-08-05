@@ -4,196 +4,153 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.session.*
-import com.example.testproject.ui.MainActivity
+import com.example.testproject.ui.VideoPlayerActivity
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
-@UnstableApi
+@OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
-    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
+    private val tAG = "PlaybackService_FinalFix"
     private val playbackHistory = mutableListOf<String>()
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) {
-                serviceScope.launch { playNextVideo() }
-            }
-        }
-
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            mediaItem?.mediaId?.let {
-                if (playbackHistory.lastOrNull() != it) {
-                    playbackHistory.add(it)
-                    if (playbackHistory.size > 20) {
-                        playbackHistory.removeAt(0)
-                    }
-                }
-            }
+            if (playbackState == Player.STATE_ENDED) serviceScope.launch { playNextVideo() }
         }
     }
 
-    // Lớp Player tùy chỉnh để kiểm soát giao diện thông báo
     private inner class CustomPlayer(player: Player) : ForwardingPlayer(player) {
-
-        override fun getAvailableCommands(): Player.Commands {
-            return super.getAvailableCommands().buildUpon()
-                .add(Player.COMMAND_SEEK_TO_NEXT)
-                .add(Player.COMMAND_SEEK_TO_PREVIOUS)
-                .build()
-        }
-
-        override fun isCommandAvailable(command: @Player.Command Int): Boolean {
-            if (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_PREVIOUS) {
-                return true
-            }
-            return super.isCommandAvailable(command)
-        }
-
-
-        override fun seekToNext() {
-            serviceScope.launch { playNextVideo() }
-        }
-
+        override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
+            .add(Player.COMMAND_SEEK_TO_NEXT).add(Player.COMMAND_SEEK_TO_PREVIOUS).build()
+        override fun isCommandAvailable(command: Int): Boolean =
+            (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_PREVIOUS) || super.isCommandAvailable(command)
+        override fun seekToNext() { serviceScope.launch { playNextVideo() } }
         @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-        override fun seekToPrevious() {
-            serviceScope.launch { playPreviousVideo() }
-        }
+        override fun seekToPrevious() { serviceScope.launch { playPreviousVideo() } }
     }
 
+    private inner class CustomMediaSessionCallback : MediaSession.Callback {
+        override fun onAddMediaItems(session: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>)
+                : ListenableFuture<MutableList<MediaItem>> {
+            mediaItems.firstOrNull()?.let { serviceScope.launch { preparePlayerFor(it) } }
+            return Futures.immediateFuture(mediaItems)
+        }
+    }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onCreate() {
         super.onCreate()
-        val exoPlayer = ExoPlayer.Builder(this).build()
+        val exoPlayer = ExoPlayer.Builder(this)
+            .setAudioAttributes(AudioAttributes.DEFAULT, true)
+            .setHandleAudioBecomingNoisy(true).build()
         exoPlayer.addListener(playerListener)
-
         val customPlayer = CustomPlayer(exoPlayer)
 
+        val sessionActivityIntent = Intent(this, VideoPlayerActivity::class.java)
+        val sessionActivityPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            sessionActivityIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         mediaSession = MediaSession.Builder(this, customPlayer)
-            .setSessionActivity(getSingleTopActivity())
-            .build()
+            .setSessionActivity(sessionActivityPendingIntent)
+            .setCallback(CustomMediaSessionCallback()).build()
     }
 
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = mediaSession?.player ?: return
-        if (!player.playWhenReady || player.mediaItemCount == 0) {
-            stopSelf()
-        }
-    }
+    private suspend fun preparePlayerFor(mediaItem: MediaItem) {
+        val pageUrl = mediaItem.mediaId
+        val player = mediaSession?.player as? ForwardingPlayer ?: return
+        val exoPlayer = player.wrappedPlayer as? ExoPlayer ?: return
 
-    private suspend fun playVideoByUrl(pageUrl: String) {
-        val currentPlayer = (mediaSession?.player as? ForwardingPlayer)?.wrappedPlayer ?: return
-
-        val streamInfo = extractStreamInfo(pageUrl)
-        if (streamInfo == null) {
-            Log.e("PlaybackService", "Không thể trích xuất thông tin stream cho URL: $pageUrl")
-            return
+        if (playbackHistory.lastOrNull() != pageUrl) {
+            playbackHistory.add(pageUrl)
+            if (playbackHistory.size > 20) { playbackHistory.removeAt(0) }
         }
 
-        Log.d("PlaybackService", "Đang phát video: ${streamInfo.second}")
-        val mediaItem = MediaItem.Builder()
-            .setUri(streamInfo.first)
-            .setMediaId(pageUrl)
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(streamInfo.second).build())
-            .build()
+        withContext(Dispatchers.IO) {
+            try {
+                val extractor = ServiceList.YouTube.getStreamExtractor(pageUrl)
+                extractor.fetchPage()
+                val title = extractor.name
 
-        currentPlayer.setMediaItem(mediaItem)
-        currentPlayer.prepare()
-        currentPlayer.play()
+                val videoStream = extractor.videoStreams.filter { it.isVideoOnly() }
+                    .maxByOrNull { if (it.getResolution().contains("720")) 1 else 0 }
+                    ?: extractor.videoStreams.maxByOrNull { it.getResolution().replace("p","").toIntOrNull() ?: 0 }
+                val audioStream = extractor.audioStreams.maxByOrNull { it.averageBitrate }
+
+                if (videoStream == null || audioStream == null) { return@withContext }
+
+                val videoItemWithMetadata = MediaItem.Builder()
+                    .setUri(videoStream.content!!)
+                    .setMediaId(pageUrl)
+                    .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build()
+
+                val audioItem = MediaItem.fromUri(audioStream.content!!)
+
+                val dataSourceFactory = ProgressiveMediaSource.Factory(DefaultHttpDataSource.Factory())
+                val videoMediaSource = dataSourceFactory.createMediaSource(videoItemWithMetadata)
+                val audioMediaSource = dataSourceFactory.createMediaSource(audioItem)
+                val mergedSource = MergingMediaSource(videoMediaSource, audioMediaSource)
+
+                withContext(Dispatchers.Main) {
+                    exoPlayer.setMediaSource(mergedSource, true)
+                    exoPlayer.prepare()
+                }
+            } catch (e: Exception) {
+                Log.e(tAG, "Lỗi nghiêm trọng trong quá trình chuẩn bị trình phát", e)
+            }
+        }
     }
-
+    //Hàm phát video tiếp theo
     private suspend fun playNextVideo() {
-        val currentMediaItem = mediaSession?.player?.currentMediaItem ?: return
-        val currentPageUrl = currentMediaItem.mediaId
-
-        Log.d("PlaybackService", "Đang tìm video tiếp theo cho: $currentPageUrl")
-        val nextVideoUrl = getNextRelatedVideoUrl(currentPageUrl)
-        if (nextVideoUrl == null) {
-            Log.w("PlaybackService", "Không tìm thấy video liên quan.")
-            return
-        }
-
-        playVideoByUrl(nextVideoUrl)
+        val currentPageUrl = mediaSession?.player?.currentMediaItem?.mediaId ?: return
+        val nextVideoUrl = getNextRelatedVideoUrl(currentPageUrl) ?: return
+        preparePlayerFor(MediaItem.Builder().setMediaId(nextVideoUrl).build())
     }
-
+    //Hàm phát video trước đó
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     private suspend fun playPreviousVideo() {
-        if (playbackHistory.size < 2) {
-            Log.w("PlaybackService", "Không có video trước đó trong lịch sử.")
-            mediaSession?.player?.seekTo(0)
-            return
-        }
-
+        if (playbackHistory.size < 2) { mediaSession?.player?.seekTo(0); return }
         playbackHistory.removeLast()
         val previousVideoUrl = playbackHistory.removeLast()
-
-        Log.d("PlaybackService", "Đang quay lại video trước đó: $previousVideoUrl")
-        playVideoByUrl(previousVideoUrl)
+        preparePlayerFor(MediaItem.Builder().setMediaId(previousVideoUrl).build())
     }
-
+    //Hàm lấy video có nội dung tương tự
     private suspend fun getNextRelatedVideoUrl(url: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                val extractor = ServiceList.YouTube.getStreamExtractor(url)
-                extractor.fetchPage()
-                extractor.relatedItems?.items?.filterIsInstance<StreamInfoItem>()?.firstOrNull()?.url
-            } catch (e: Exception) {
-                Log.e("PlaybackService", "Lỗi khi lấy video liên quan", e)
-                null
-            }
+                ServiceList.YouTube.getStreamExtractor(url).apply { fetchPage() }
+                    .relatedItems?.items?.filterIsInstance<StreamInfoItem>()?.firstOrNull()?.url
+            } catch (e: Exception) { null }
         }
-    }
-
-    private suspend fun extractStreamInfo(url: String): Pair<String, String>? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val extractor = ServiceList.YouTube.getStreamExtractor(url)
-                extractor.fetchPage()
-                val streamUrl = extractor.videoStreams.minByOrNull {
-                    val resolution = it.resolution.replace("p", "").toIntOrNull() ?: 0
-                    kotlin.math.abs(resolution - 720)
-                }?.url
-
-                if (streamUrl != null) {
-                    Pair(streamUrl, extractor.name)
-                } else {
-                    null
-                }
-            } catch (e: Exception) {
-                Log.e("PlaybackService", "Lỗi khi trích xuất thông tin stream", e)
-                null
-            }
-        }
-    }
-
-    private fun getSingleTopActivity(): PendingIntent {
-        return PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
     }
 
     override fun onDestroy() {
-        serviceScope.cancel()
-        mediaSession?.run {
-            player.release()
-            release()
-            mediaSession = null
-        }
         super.onDestroy()
+        serviceScope.cancel()
+        mediaSession?.run { player.release(); release(); mediaSession = null }
     }
 }

@@ -54,7 +54,7 @@ class DownloaderImpl private constructor(
                 response.message,
                 response.headers.toNewPipeHeaders(),
                 response.body?.string(),
-                latestUrl // <-- Sửa ở đây: Cung cấp tham số còn thiếu
+                latestUrl
             )
 
         } catch (e: IOException) {
