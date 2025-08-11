@@ -24,7 +24,6 @@ import kotlinx.coroutines.*
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 
 @OptIn(UnstableApi::class)
