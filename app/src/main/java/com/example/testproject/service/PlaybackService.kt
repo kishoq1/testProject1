@@ -23,6 +23,9 @@ import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -61,7 +64,21 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setAllocator(DefaultAllocator(true, 16 * 1024)) // Cấp phát bộ nhớ
+            .setBufferDurationsMs(
+                32 * 1024, // minBufferMs: Tối thiểu 32 giây
+                64 * 1024, // maxBufferMs: Tối đa 64 giây
+                10 * 1024, // bufferForPlaybackMs: Cần 10 giây để bắt đầu phát
+                5 * 1024   // bufferForPlaybackAfterRebufferMs: Cần 5 giây sau khi buffer lại
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+
         val exoPlayer = ExoPlayer.Builder(this)
+            .setLoadControl(loadControl)
             .setAudioAttributes(AudioAttributes.DEFAULT, true)
             .setHandleAudioBecomingNoisy(true).build()
         exoPlayer.addListener(playerListener)
@@ -97,9 +114,11 @@ class PlaybackService : MediaSessionService() {
                 val title = extractor.name
 
                 val videoStream = extractor.videoStreams.filter { it.isVideoOnly() }
-                    .maxByOrNull { if (it.getResolution().contains("720")) 1 else 0 }
+                    .maxByOrNull { if (it.getResolution().contains("480")) 1 else 0 }
                     ?: extractor.videoStreams.maxByOrNull { it.getResolution().replace("p","").toIntOrNull() ?: 0 }
-                val audioStream = extractor.audioStreams.maxByOrNull { it.averageBitrate }
+                val audioStream = extractor.audioStreams
+                    .maxByOrNull { if (it.format!!.name.contains("M4A")) 1 else 0 }
+                    ?: extractor.audioStreams.maxByOrNull { it.averageBitrate }
 
                 if (videoStream == null || audioStream == null) { return@withContext }
 
