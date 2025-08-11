@@ -14,6 +14,10 @@ dependencyResolutionManagement {
     }
 }
 
+gradle.extra.apply {
+    set("androidxMediaEnableMidiModule", true)
+}
+
 // 1. Đặt tên dự án gốc trước
 rootProject.name = "testProject"
 

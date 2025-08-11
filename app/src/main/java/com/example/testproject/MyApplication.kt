@@ -7,7 +7,6 @@ import org.schabi.newpipe.extractor.NewPipe
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Khởi tạo NewPipeExtractor một lần duy nhất tại đây
         NewPipe.init(DownloaderImpl.init(null))
     }
 }
