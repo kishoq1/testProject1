@@ -2,20 +2,24 @@ package com.example.testproject.service
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.TrafficStats
 import android.os.Build
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.session.*
 import com.example.testproject.ui.VideoPlayerActivity
 import com.google.common.util.concurrent.Futures
@@ -23,8 +27,6 @@ import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.upstream.DefaultAllocator
 
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -32,8 +34,9 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
-    private val tAG = "PlaybackService_FinalFix"
+    private val tAG = "PlaybackService_Stable"
     private val playbackHistory = mutableListOf<String>()
+
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -61,25 +64,36 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
+        TrafficStats.setThreadStatsTag(0xF00D)
+        startForegroundService(Intent(this, PlaybackService::class.java))
 
         val loadControl = DefaultLoadControl.Builder()
-            .setAllocator(DefaultAllocator(true, 16 * 1024)) // Cấp phát bộ nhớ
+            .setAllocator(DefaultAllocator(true, 16 * 1024))
             .setBufferDurationsMs(
-                32 * 1024, // minBufferMs: Tối thiểu 32 giây
-                64 * 1024, // maxBufferMs: Tối đa 64 giây
-                10 * 1024, // bufferForPlaybackMs: Cần 10 giây để bắt đầu phát
-                5 * 1024   // bufferForPlaybackAfterRebufferMs: Cần 5 giây sau khi buffer lại
+                30_000, // Min buffer 30s
+                120_000, // Max buffer 120s
+                2_000, // Buffer before playback 2s
+                5_000  // Buffer after rebuffer 5s
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+
+            .build()
 
         val exoPlayer = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
-            .setAudioAttributes(AudioAttributes.DEFAULT, true)
-            .setHandleAudioBecomingNoisy(true).build()
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .build()
+
         exoPlayer.addListener(playerListener)
         val customPlayer = CustomPlayer(exoPlayer)
 
@@ -131,7 +145,7 @@ class PlaybackService : MediaSessionService() {
                 val dataSourceFactory = ProgressiveMediaSource.Factory(DefaultHttpDataSource.Factory())
                 val videoMediaSource = dataSourceFactory.createMediaSource(videoItemWithMetadata)
                 val audioMediaSource = dataSourceFactory.createMediaSource(audioItem)
-                val mergedSource = MergingMediaSource(videoMediaSource, audioMediaSource)
+                val mergedSource = MergingMediaSource(true, videoMediaSource, audioMediaSource)
 
                 withContext(Dispatchers.Main) {
                     exoPlayer.setMediaSource(mergedSource, true)
@@ -142,13 +156,13 @@ class PlaybackService : MediaSessionService() {
             }
         }
     }
-    //Hàm phát video tiếp theo
+
     private suspend fun playNextVideo() {
         val currentPageUrl = mediaSession?.player?.currentMediaItem?.mediaId ?: return
         val nextVideoUrl = getNextRelatedVideoUrl(currentPageUrl) ?: return
         preparePlayerFor(MediaItem.Builder().setMediaId(nextVideoUrl).build())
     }
-    //Hàm phát video trước đó
+
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     private suspend fun playPreviousVideo() {
         if (playbackHistory.size < 2) { mediaSession?.player?.seekTo(0); return }
@@ -156,7 +170,7 @@ class PlaybackService : MediaSessionService() {
         val previousVideoUrl = playbackHistory.removeLast()
         preparePlayerFor(MediaItem.Builder().setMediaId(previousVideoUrl).build())
     }
-    //Hàm lấy video có nội dung tương tự
+
     private suspend fun getNextRelatedVideoUrl(url: String): String? {
         return withContext(Dispatchers.IO) {
             try {
@@ -171,4 +185,5 @@ class PlaybackService : MediaSessionService() {
         serviceScope.cancel()
         mediaSession?.run { player.release(); release(); mediaSession = null }
     }
+
 }
