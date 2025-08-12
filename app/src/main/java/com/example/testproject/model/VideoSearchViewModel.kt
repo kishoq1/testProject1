@@ -11,11 +11,9 @@ class VideoSearchViewModel(
     private val repository: VideoRepository = VideoRepository
 ) : ViewModel() {
 
-    // Giữ lại phần kết quả tìm kiếm
     private val _searchResults = MutableStateFlow<List<Video>>(emptyList())
     val searchResults: StateFlow<List<Video>> = _searchResults
 
-    // Giữ lại hàm tìm kiếm
     fun searchVideos(query: String) {
         val trimmedQuery = query.trim()
         if (trimmedQuery.isNotEmpty()) {

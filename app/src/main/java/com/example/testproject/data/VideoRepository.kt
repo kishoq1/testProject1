@@ -20,7 +20,7 @@ object VideoRepository {
 
             val results = extractor.initialPage.items.mapNotNull { item ->
                 if (item is StreamInfoItem) {
-                    val thumbnailUrl = item.getThumbnails().firstOrNull()?.getUrl() ?: ""
+                    val thumbnailUrl = item.getThumbnails().firstOrNull()?.url ?: ""
                     Video(
                         title = item.name,
                         url = item.url,
@@ -35,6 +35,35 @@ object VideoRepository {
         } catch (e: Exception) {
             Log.e("VideoRepository", "Error searching for videos", e)
             return@withContext emptyList<Video>()
+        }
+    }
+
+    suspend fun getRelatedVideos(url: String): List<Video> = withContext(Dispatchers.IO) {
+        if (url.isBlank()) {
+            return@withContext emptyList()
+        }
+
+        try {
+            val extractor = ServiceList.YouTube.getStreamExtractor(url)
+            extractor.fetchPage()
+
+            val relatedVideos = extractor.relatedItems!!.items.mapNotNull { item ->
+                if (item is StreamInfoItem) {
+                    val thumbnailUrl = item.getThumbnails().firstOrNull()?.url ?: ""
+                    Video(
+                        title = item.name,
+                        url = item.url,
+                        thumbnailUrl = thumbnailUrl
+                    )
+                } else {
+                    null
+                }
+            }
+            return@withContext relatedVideos
+
+        } catch (e: Exception) {
+            Log.e("VideoRepository", "Error fetching related videos", e)
+            return@withContext emptyList()
         }
     }
 }
