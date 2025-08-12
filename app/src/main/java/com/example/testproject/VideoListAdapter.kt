@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.example.testproject.model.Video
@@ -30,19 +31,27 @@ fun VideoListItem(video: Video, onClick: () -> Unit) {
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(modifier = Modifier.padding(8.dp)) {
+        // Thay đổi từ Row sang Column để xếp các thành phần theo chiều dọc
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Chỉnh sửa Image để chiếm toàn bộ chiều rộng và có tỷ lệ khung hình 16:9
             Image(
                 painter = rememberAsyncImagePainter(video.thumbnailUrl),
-                contentDescription = null,
-                modifier = Modifier.size(100.dp)
+                contentDescription = video.title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f), // Đặt tỷ lệ khung hình cho ảnh
+                contentScale = ContentScale.Crop // Căn chỉnh ảnh để lấp đầy khung
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            // Thêm khoảng cách giữa ảnh và tiêu đề
+            Spacer(modifier = Modifier.height(8.dp))
+            // Hiển thị tiêu đề bên dưới ảnh
             Text(
                 text = video.title,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(horizontal = 8.dp) // Thêm padding cho tiêu đề
+                    .padding(bottom = 8.dp)
             )
         }
     }
