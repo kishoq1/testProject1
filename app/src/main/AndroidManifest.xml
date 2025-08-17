@@ -34,7 +34,10 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.VideoPlayerActivity"
-            android:launchMode="singleTop" />
+            android:launchMode="singleTop"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:resizeableActivity="true" />
 
         <service
         android:name=".service.PlaybackService"
