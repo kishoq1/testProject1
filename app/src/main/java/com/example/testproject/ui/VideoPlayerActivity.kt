@@ -179,21 +179,14 @@ class VideoPlayerActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Bắt sự kiện người dùng rời khỏi ứng dụng (ví dụ: nhấn nút Home).
-     * Nếu video đang phát, vào chế độ Picture-in-Picture.
-     */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        // Chỉ hoạt động trên Android Oreo (API 26) trở lên
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             controller?.let {
                 if (it.isPlaying) {
-                    // Tạo các tham số cho cửa sổ PiP với tỷ lệ 16:9
                     val params = PictureInPictureParams.Builder()
                         .setAspectRatio(Rational(16, 9))
                         .build()
-                    // Yêu cầu vào chế độ PiP
                     enterPictureInPictureMode(params)
                 }
             }

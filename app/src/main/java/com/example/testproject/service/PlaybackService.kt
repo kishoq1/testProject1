@@ -73,10 +73,10 @@ class PlaybackService : MediaSessionService() {
         val loadControl = DefaultLoadControl.Builder()
             .setAllocator(DefaultAllocator(true, 16 * 1024))
             .setBufferDurationsMs(
-                30_000, // Min buffer 30s
-                120_000, // Max buffer 120s
-                2_000, // Buffer before playback 2s
-                5_000  // Buffer after rebuffer 5s
+                30_000,
+                120_000,
+                2_000,
+                5_000
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()

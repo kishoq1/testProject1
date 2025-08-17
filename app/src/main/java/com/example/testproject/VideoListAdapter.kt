@@ -31,16 +31,14 @@ fun VideoListItem(video: Video, onClick: () -> Unit) {
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        // Thay đổi từ Row sang Column để xếp các thành phần theo chiều dọc
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Chỉnh sửa Image để chiếm toàn bộ chiều rộng và có tỷ lệ khung hình 16:9
             Image(
                 painter = rememberAsyncImagePainter(video.thumbnailUrl),
                 contentDescription = video.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f), // Đặt tỷ lệ khung hình cho ảnh
-                contentScale = ContentScale.Crop // Căn chỉnh ảnh để lấp đầy khung
+                    .aspectRatio(16f / 9f),
+                contentScale = ContentScale.Crop
             )
             // Thêm khoảng cách giữa ảnh và tiêu đề
             Spacer(modifier = Modifier.height(8.dp))
