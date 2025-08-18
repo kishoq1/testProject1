@@ -110,6 +110,13 @@ class PlaybackService : MediaSessionService() {
             .setCallback(CustomMediaSessionCallback()).build()
     }
 
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        stopSelf()
+    }
+
+
     private suspend fun preparePlayerFor(mediaItem: MediaItem) {
         val pageUrl = mediaItem.mediaId
         val player = mediaSession?.player as? ForwardingPlayer ?: return
