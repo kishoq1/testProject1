@@ -60,7 +60,7 @@ class VideoPlayerActivity : ComponentActivity() {
             YourAppTheme {
                 var player by remember { mutableStateOf<Player?>(null) }
                 var isFullScreen by rememberSaveable { mutableStateOf(false) }
-                var videoAspectRatio by remember { mutableFloatStateOf(16 / 9f) }
+                var videoAspectRatio by remember { mutableStateOf(16 / 9f) }
 
                 var currentTitle by rememberSaveable { mutableStateOf(initialVideoTitle) }
                 var relatedVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
@@ -138,6 +138,30 @@ class VideoPlayerActivity : ComponentActivity() {
                             onToggleFullScreen = { isFullScreen = false }
                         )
                     } else {
+                        // Bắt đầu khối mã đã chỉnh sửa
+                        var isPlaying by remember { mutableStateOf(controller?.isPlaying ?: false) }
+
+                        DisposableEffect(controller) {
+                            val listener = object : Player.Listener {
+                                override fun onIsPlayingChanged(playing: Boolean) {
+                                    isPlaying = playing
+                                }
+                            }
+                            controller?.addListener(listener)
+                            onDispose {
+                                controller?.removeListener(listener)
+                            }
+                        }
+
+                        BackHandler(enabled = !isFullScreen && isPlaying) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val params = PictureInPictureParams.Builder()
+                                    .setAspectRatio(Rational(16, 9))
+                                    .build()
+                                enterPictureInPictureMode(params)
+                            }
+                        }
+
                         Column(modifier = Modifier.fillMaxSize()) {
                             VideoPlayerScreen(
                                 player = player,
@@ -173,6 +197,7 @@ class VideoPlayerActivity : ComponentActivity() {
                                 }
                             }
                         }
+                        // Kết thúc khối mã đã chỉnh sửa
                     }
                 }
             }
