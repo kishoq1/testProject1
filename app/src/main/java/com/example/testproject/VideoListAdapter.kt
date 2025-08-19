@@ -14,8 +14,10 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.testproject.model.Video
 
 @Composable
-fun VideoList(videos: List<Video>, onVideoClick: (Video) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+// **BẮT ĐẦU THAY ĐỔI**
+fun VideoList(videos: List<Video>, onVideoClick: (Video) -> Unit, modifier: Modifier = Modifier) {
+    LazyColumn(modifier = modifier.fillMaxSize()) { // Áp dụng modifier ở đây
+// **KẾT THÚC THAY ĐỔI**
         items(videos) { video ->
             VideoListItem(video = video, onClick = { onVideoClick(video) })
         }

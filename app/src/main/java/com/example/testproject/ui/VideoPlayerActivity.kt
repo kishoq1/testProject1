@@ -3,6 +3,7 @@ package com.example.testproject.ui
 import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
@@ -62,20 +63,25 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         instance = this
 
-        val initialPageUrl = intent.getStringExtra("video_url")
-        val initialVideoTitle = intent.getStringExtra("video_title") ?: "Video"
-        val isFirstTimeCreated = savedInstanceState == null
-
         setContent {
             YourAppTheme {
                 var player by remember { mutableStateOf<Player?>(null) }
                 var isFullScreen by rememberSaveable { mutableStateOf(false) }
-                var videoAspectRatio by remember { mutableStateOf(16 / 9f) }
+                var videoAspectRatio by remember { mutableFloatStateOf(16 / 9f) }
 
-                var currentTitle by rememberSaveable { mutableStateOf(initialVideoTitle) }
-                var relatedVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
+                val currentTitle = remember { mutableStateOf("") }
+                val relatedVideos = remember { mutableStateOf<List<Video>>(emptyList()) }
 
                 val context = LocalContext.current as ComponentActivity
+
+                fun updateUiFromController(controller: MediaController) {
+                    controller.currentMediaItem?.let { mediaItem ->
+                        currentTitle.value = mediaItem.mediaMetadata.title?.toString() ?: ""
+                        lifecycleScope.launch {
+                            relatedVideos.value = VideoRepository.getRelatedVideos(mediaItem.mediaId)
+                        }
+                    }
+                }
 
                 BackHandler(enabled = isFullScreen) {
                     isFullScreen = false
@@ -85,7 +91,6 @@ class VideoPlayerActivity : ComponentActivity() {
                     context.requestedOrientation = if (isFullScreen) {
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     } else {
-                        // Sửa lại thành UNSPECIFIED để xoay tự do khi không full screen
                         ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
@@ -103,12 +108,7 @@ class VideoPlayerActivity : ComponentActivity() {
 
                         override fun onEvents(player: Player, events: Player.Events) {
                             if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
-                                player.currentMediaItem?.let { mediaItem ->
-                                    currentTitle = mediaItem.mediaMetadata.title.toString()
-                                    lifecycleScope.launch {
-                                        relatedVideos = VideoRepository.getRelatedVideos(mediaItem.mediaId)
-                                    }
-                                }
+                                updateUiFromController(player as MediaController)
                             }
                         }
                     }
@@ -118,8 +118,11 @@ class VideoPlayerActivity : ComponentActivity() {
                         player = connectedController
                         connectedController.addListener(playerListener)
 
-                        if (isFirstTimeCreated && !initialPageUrl.isNullOrEmpty()) {
-                            val mediaMetadata = MediaMetadata.Builder().setTitle(currentTitle).build()
+                        val initialPageUrl = intent.getStringExtra("video_url")
+                        val initialVideoTitle = intent.getStringExtra("video_title") ?: "Video"
+
+                        if (connectedController.currentMediaItem == null && !initialPageUrl.isNullOrEmpty()) {
+                            val mediaMetadata = MediaMetadata.Builder().setTitle(initialVideoTitle).build()
                             val mediaItem = MediaItem.Builder()
                                 .setMediaId(initialPageUrl)
                                 .setMediaMetadata(mediaMetadata)
@@ -127,10 +130,9 @@ class VideoPlayerActivity : ComponentActivity() {
                             connectedController.setMediaItem(mediaItem)
                             connectedController.playWhenReady = true
                             connectedController.prepare()
-
-                            lifecycleScope.launch {
-                                relatedVideos = VideoRepository.getRelatedVideos(initialPageUrl)
-                            }
+                            updateUiFromController(connectedController)
+                        } else {
+                            updateUiFromController(connectedController)
                         }
 
                     }, ContextCompat.getMainExecutor(this@VideoPlayerActivity))
@@ -149,9 +151,7 @@ class VideoPlayerActivity : ComponentActivity() {
                             onToggleFullScreen = { isFullScreen = false }
                         )
                     } else {
-                        // **BẮT ĐẦU SỬA LỖI**
                         var isPlaying by remember { mutableStateOf(controller?.isPlaying ?: false) }
-                        // **KẾT THÚC SỬA LỖI**
 
                         DisposableEffect(controller) {
                             val listener = object : Player.Listener {
@@ -165,14 +165,6 @@ class VideoPlayerActivity : ComponentActivity() {
                             }
                         }
 
-                        BackHandler(enabled = !isFullScreen && isPlaying) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                val params = PictureInPictureParams.Builder()
-                                    .setAspectRatio(Rational(16, 9))
-                                    .build()
-                                enterPictureInPictureMode(params)
-                            }
-                        }
 
                         Column(modifier = Modifier.fillMaxSize()) {
                             VideoPlayerScreen(
@@ -186,13 +178,13 @@ class VideoPlayerActivity : ComponentActivity() {
                             LazyColumn(modifier = Modifier.weight(1f)) {
                                 item {
                                     Text(
-                                        text = currentTitle,
+                                        text = currentTitle.value,
                                         fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                     )
                                 }
-                                items(relatedVideos) { video ->
+                                items(relatedVideos.value) { video ->
                                     VideoListItem(
                                         video = video,
                                         onClick = {
@@ -235,4 +227,9 @@ class VideoPlayerActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+    }
+
 }

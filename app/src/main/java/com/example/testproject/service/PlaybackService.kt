@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.session.*
+import com.example.testproject.model.PlaybackState
 import com.example.testproject.ui.VideoPlayerActivity
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -42,26 +43,36 @@ class PlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) serviceScope.launch { playNextVideo() }
         }
+
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            mediaItem?.let {
+                val title = it.mediaMetadata.title?.toString() ?: "Đang phát"
+                val url = it.mediaId
+                PlaybackState.setCurrentVideo(title, url)
+            }
+        }
     }
 
-    // **BẮT ĐẦU THAY ĐỔI**
     private inner class CustomPlayer(player: Player) : ForwardingPlayer(player) {
-        // Khôi phục lại các lệnh điều khiển previous
         override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
             .add(Player.COMMAND_SEEK_TO_NEXT).add(Player.COMMAND_SEEK_TO_PREVIOUS).build()
         override fun isCommandAvailable(command: Int): Boolean =
             (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_PREVIOUS) || super.isCommandAvailable(command)
         override fun seekToNext() { serviceScope.launch { playNextVideo() } }
-        // Khôi phục lại hàm seekToPrevious
-        @RequiresApi(Build.VERSION_CODES.O) // VANILLA_ICE_CREAM yêu cầu API 35, nên dùng O (API 26) cho an toàn
+        @RequiresApi(Build.VERSION_CODES.O)
         override fun seekToPrevious() { serviceScope.launch { playPreviousVideo() } }
     }
-    // **KẾT THÚC THAY ĐỔI**
 
     private inner class CustomMediaSessionCallback : MediaSession.Callback {
         override fun onAddMediaItems(session: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>)
                 : ListenableFuture<MutableList<MediaItem>> {
-            mediaItems.firstOrNull()?.let { serviceScope.launch { preparePlayerFor(it) } }
+            mediaItems.firstOrNull()?.let {
+                // Cập nhật trạng thái ngay khi video được thêm vào
+                val title = it.mediaMetadata.title?.toString() ?: "Đang tải..."
+                PlaybackState.setCurrentVideo(title, it.mediaId)
+                serviceScope.launch { preparePlayerFor(it) }
+            }
             return Futures.immediateFuture(mediaItems)
         }
     }
@@ -171,25 +182,23 @@ class PlaybackService : MediaSessionService() {
     private suspend fun playNextVideo() {
         val currentPageUrl = mediaSession?.player?.currentMediaItem?.mediaId ?: return
         val nextVideoUrl = getNextRelatedVideoUrl(currentPageUrl) ?: return
-        preparePlayerFor(MediaItem.Builder().setMediaId(nextVideoUrl).build())
+        val nextMediaItem = MediaItem.Builder().setMediaId(nextVideoUrl).build()
+        val title = nextMediaItem.mediaMetadata.title?.toString() ?: "Đang tải..."
+        PlaybackState.setCurrentVideo(title, nextVideoUrl)
+        // **KẾT THÚC THAY ĐỔI**
+        preparePlayerFor(nextMediaItem)
     }
 
-    // **BẮT ĐẦU THAY ĐỔI**
-    // Khôi phục lại hàm playPreviousVideo
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun playPreviousVideo() {
-        // Nếu lịch sử có ít hơn 2 video, chỉ tua về đầu video hiện tại
-        if (playbackHistory.size < 2) {
-            mediaSession?.player?.seekTo(0)
-            return
-        }
-        // Xóa video hiện tại khỏi lịch sử
+        if (playbackHistory.size < 2) { mediaSession?.player?.seekTo(0); return }
         playbackHistory.removeLast()
-        // Lấy video trước đó và xóa nó khỏi lịch sử (để hàm preparePlayerFor thêm lại)
         val previousVideoUrl = playbackHistory.removeLast()
-        preparePlayerFor(MediaItem.Builder().setMediaId(previousVideoUrl).build())
+        val prevMediaItem = MediaItem.Builder().setMediaId(previousVideoUrl).build()
+        val title = prevMediaItem.mediaMetadata.title?.toString() ?: "Đang tải..."
+        PlaybackState.setCurrentVideo(title, previousVideoUrl)
+        preparePlayerFor(prevMediaItem)
     }
-    // **KẾT THÚC THAY ĐỔI**
 
     private suspend fun getNextRelatedVideoUrl(url: String): String? {
         return withContext(Dispatchers.IO) {
@@ -204,6 +213,7 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
         serviceScope.cancel()
         mediaSession?.run { player.release(); release(); mediaSession = null }
+        PlaybackState.clear()
     }
 
 }

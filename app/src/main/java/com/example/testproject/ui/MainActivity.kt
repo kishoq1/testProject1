@@ -19,15 +19,17 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     VideoSearchScreen(
                         onVideoClick = { video ->
-                            // **BẮT ĐẦU THAY ĐỔI**
-                            // Đóng Activity đang phát video cũ (nếu có) trước khi mở video mới.
                             VideoPlayerActivity.finishActivity()
-                            // **KẾT THÚC THAY ĐỔI**
-
                             val intent = Intent(this, VideoPlayerActivity::class.java)
                             intent.putExtra("video_url", video.url)
                             intent.putExtra("video_title", video.title)
                             startActivity(intent)
+                        },
+                        onMiniPlayerClick = {
+                            val intent = Intent(this, VideoPlayerActivity::class.java)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                            startActivity(intent)
+                            VideoPlayerActivity.finishActivity()
                         }
                     )
                 }
