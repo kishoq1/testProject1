@@ -44,15 +44,19 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    // **BẮT ĐẦU THAY ĐỔI**
     private inner class CustomPlayer(player: Player) : ForwardingPlayer(player) {
+        // Khôi phục lại các lệnh điều khiển previous
         override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
             .add(Player.COMMAND_SEEK_TO_NEXT).add(Player.COMMAND_SEEK_TO_PREVIOUS).build()
         override fun isCommandAvailable(command: Int): Boolean =
             (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_PREVIOUS) || super.isCommandAvailable(command)
         override fun seekToNext() { serviceScope.launch { playNextVideo() } }
-        @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+        // Khôi phục lại hàm seekToPrevious
+        @RequiresApi(Build.VERSION_CODES.O) // VANILLA_ICE_CREAM yêu cầu API 35, nên dùng O (API 26) cho an toàn
         override fun seekToPrevious() { serviceScope.launch { playPreviousVideo() } }
     }
+    // **KẾT THÚC THAY ĐỔI**
 
     private inner class CustomMediaSessionCallback : MediaSession.Callback {
         override fun onAddMediaItems(session: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>)
@@ -170,13 +174,22 @@ class PlaybackService : MediaSessionService() {
         preparePlayerFor(MediaItem.Builder().setMediaId(nextVideoUrl).build())
     }
 
-    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    // **BẮT ĐẦU THAY ĐỔI**
+    // Khôi phục lại hàm playPreviousVideo
+    @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun playPreviousVideo() {
-        if (playbackHistory.size < 2) { mediaSession?.player?.seekTo(0); return }
+        // Nếu lịch sử có ít hơn 2 video, chỉ tua về đầu video hiện tại
+        if (playbackHistory.size < 2) {
+            mediaSession?.player?.seekTo(0)
+            return
+        }
+        // Xóa video hiện tại khỏi lịch sử
         playbackHistory.removeLast()
+        // Lấy video trước đó và xóa nó khỏi lịch sử (để hàm preparePlayerFor thêm lại)
         val previousVideoUrl = playbackHistory.removeLast()
         preparePlayerFor(MediaItem.Builder().setMediaId(previousVideoUrl).build())
     }
+    // **KẾT THÚC THAY ĐỔI**
 
     private suspend fun getNextRelatedVideoUrl(url: String): String? {
         return withContext(Dispatchers.IO) {

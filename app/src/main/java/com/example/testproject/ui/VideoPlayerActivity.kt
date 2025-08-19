@@ -44,6 +44,15 @@ import kotlinx.coroutines.launch
 @OptIn(UnstableApi::class)
 class VideoPlayerActivity : ComponentActivity() {
 
+    companion object {
+        @SuppressLint("StaticFieldLeak")
+        private var instance: VideoPlayerActivity? = null
+
+        fun finishActivity() {
+            instance?.finish()
+        }
+    }
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val controller: MediaController?
         get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
@@ -51,6 +60,7 @@ class VideoPlayerActivity : ComponentActivity() {
     @SuppressLint("ContextCastToActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
 
         val initialPageUrl = intent.getStringExtra("video_url")
         val initialVideoTitle = intent.getStringExtra("video_title") ?: "Video"
@@ -75,7 +85,8 @@ class VideoPlayerActivity : ComponentActivity() {
                     context.requestedOrientation = if (isFullScreen) {
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     } else {
-                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                        // Sửa lại thành UNSPECIFIED để xoay tự do khi không full screen
+                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
 
@@ -138,8 +149,9 @@ class VideoPlayerActivity : ComponentActivity() {
                             onToggleFullScreen = { isFullScreen = false }
                         )
                     } else {
-                        // Bắt đầu khối mã đã chỉnh sửa
+                        // **BẮT ĐẦU SỬA LỖI**
                         var isPlaying by remember { mutableStateOf(controller?.isPlaying ?: false) }
+                        // **KẾT THÚC SỬA LỖI**
 
                         DisposableEffect(controller) {
                             val listener = object : Player.Listener {
@@ -197,10 +209,16 @@ class VideoPlayerActivity : ComponentActivity() {
                                 }
                             }
                         }
-                        // Kết thúc khối mã đã chỉnh sửa
                     }
                 }
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (instance == this) {
+            instance = null
         }
     }
 
