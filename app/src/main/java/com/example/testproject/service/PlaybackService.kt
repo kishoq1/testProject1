@@ -22,7 +22,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.session.*
 import com.example.testproject.model.PlaybackState
-import com.example.testproject.ui.VideoPlayerActivity
+import com.example.testproject.ui.MainActivity
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
@@ -47,7 +47,7 @@ class PlaybackService : MediaSessionService() {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem?.let {
-                val title = it.mediaMetadata.title?.toString() ?: "Đang phát"
+                val title = it.mediaMetadata.title?.toString() ?: "dang phát"
                 val url = it.mediaId
                 PlaybackState.setCurrentVideo(title, url)
             }
@@ -68,8 +68,7 @@ class PlaybackService : MediaSessionService() {
         override fun onAddMediaItems(session: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>)
                 : ListenableFuture<MutableList<MediaItem>> {
             mediaItems.firstOrNull()?.let {
-                // Cập nhật trạng thái ngay khi video được thêm vào
-                val title = it.mediaMetadata.title?.toString() ?: "Đang tải..."
+                val title = it.mediaMetadata.title?.toString() ?: "dang tải..."
                 PlaybackState.setCurrentVideo(title, it.mediaId)
                 serviceScope.launch { preparePlayerFor(it) }
             }
@@ -112,7 +111,9 @@ class PlaybackService : MediaSessionService() {
         exoPlayer.addListener(playerListener)
         val customPlayer = CustomPlayer(exoPlayer)
 
-        val sessionActivityIntent = Intent(this, VideoPlayerActivity::class.java)
+        val sessionActivityIntent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        }
         val sessionActivityPendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -174,7 +175,7 @@ class PlaybackService : MediaSessionService() {
                     exoPlayer.prepare()
                 }
             } catch (e: Exception) {
-                Log.e(tAG, "Lỗi nghiêm trọng trong quá trình chuẩn bị trình phát", e)
+                Log.e(tAG, "Lỗi n trọng trong quá trình cbị trình phát", e)
             }
         }
     }
@@ -183,9 +184,8 @@ class PlaybackService : MediaSessionService() {
         val currentPageUrl = mediaSession?.player?.currentMediaItem?.mediaId ?: return
         val nextVideoUrl = getNextRelatedVideoUrl(currentPageUrl) ?: return
         val nextMediaItem = MediaItem.Builder().setMediaId(nextVideoUrl).build()
-        val title = nextMediaItem.mediaMetadata.title?.toString() ?: "Đang tải..."
+        val title = nextMediaItem.mediaMetadata.title?.toString() ?: "dang tải..."
         PlaybackState.setCurrentVideo(title, nextVideoUrl)
-        // **KẾT THÚC THAY ĐỔI**
         preparePlayerFor(nextMediaItem)
     }
 
@@ -195,7 +195,7 @@ class PlaybackService : MediaSessionService() {
         playbackHistory.removeLast()
         val previousVideoUrl = playbackHistory.removeLast()
         val prevMediaItem = MediaItem.Builder().setMediaId(previousVideoUrl).build()
-        val title = prevMediaItem.mediaMetadata.title?.toString() ?: "Đang tải..."
+        val title = prevMediaItem.mediaMetadata.title?.toString() ?: "dang tải..."
         PlaybackState.setCurrentVideo(title, previousVideoUrl)
         preparePlayerFor(prevMediaItem)
     }

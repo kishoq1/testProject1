@@ -3,7 +3,6 @@ package com.example.testproject.ui
 import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.ComponentName
-import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
@@ -57,11 +56,6 @@ class VideoPlayerActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val controller: MediaController?
         get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
-
-    // onNewIntent không còn cần thiết với logic này
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-    }
 
     @SuppressLint("ContextCastToActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,8 +120,6 @@ class VideoPlayerActivity : ComponentActivity() {
                         val initialPageUrl = intent.getStringExtra("video_url")
                         val initialVideoTitle = intent.getStringExtra("video_title") ?: "Video"
 
-                        // **ĐÂY LÀ THAY ĐỔI QUAN TRỌNG**
-                        // Luôn gửi lệnh phát video mới từ Intent, không kiểm tra trạng thái cũ.
                         if (!initialPageUrl.isNullOrEmpty()) {
                             val mediaMetadata = MediaMetadata.Builder().setTitle(initialVideoTitle).build()
                             val mediaItem = MediaItem.Builder()
@@ -139,7 +131,6 @@ class VideoPlayerActivity : ComponentActivity() {
                             connectedController.prepare()
                         }
 
-                        // Cập nhật UI với thông tin từ controller sau khi có thể đã được cập nhật
                         updateUiFromController(connectedController)
 
 

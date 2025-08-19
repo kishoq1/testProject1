@@ -14,10 +14,9 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.testproject.model.Video
 
 @Composable
-// **BẮT ĐẦU THAY ĐỔI**
+
 fun VideoList(videos: List<Video>, onVideoClick: (Video) -> Unit, modifier: Modifier = Modifier) {
-    LazyColumn(modifier = modifier.fillMaxSize()) { // Áp dụng modifier ở đây
-// **KẾT THÚC THAY ĐỔI**
+    LazyColumn(modifier = modifier.fillMaxSize()) {
         items(videos) { video ->
             VideoListItem(video = video, onClick = { onVideoClick(video) })
         }
@@ -42,15 +41,13 @@ fun VideoListItem(video: Video, onClick: () -> Unit) {
                     .aspectRatio(16f / 9f),
                 contentScale = ContentScale.Crop
             )
-            // Thêm khoảng cách giữa ảnh và tiêu đề
             Spacer(modifier = Modifier.height(8.dp))
-            // Hiển thị tiêu đề bên dưới ảnh
             Text(
                 text = video.title,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp) // Thêm padding cho tiêu đề
+                    .padding(horizontal = 8.dp)
                     .padding(bottom = 8.dp)
             )
         }
