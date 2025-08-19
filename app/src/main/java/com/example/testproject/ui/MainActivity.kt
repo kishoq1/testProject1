@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
                     VideoSearchScreen(
                         onVideoClick = { video ->
                             VideoPlayerActivity.finishActivity()
+
                             val intent = Intent(this, VideoPlayerActivity::class.java)
                             intent.putExtra("video_url", video.url)
                             intent.putExtra("video_title", video.title)

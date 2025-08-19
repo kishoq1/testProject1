@@ -58,6 +58,11 @@ class VideoPlayerActivity : ComponentActivity() {
     private val controller: MediaController?
         get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
 
+    // onNewIntent không còn cần thiết với logic này
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+    }
+
     @SuppressLint("ContextCastToActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -121,7 +126,9 @@ class VideoPlayerActivity : ComponentActivity() {
                         val initialPageUrl = intent.getStringExtra("video_url")
                         val initialVideoTitle = intent.getStringExtra("video_title") ?: "Video"
 
-                        if (connectedController.currentMediaItem == null && !initialPageUrl.isNullOrEmpty()) {
+                        // **ĐÂY LÀ THAY ĐỔI QUAN TRỌNG**
+                        // Luôn gửi lệnh phát video mới từ Intent, không kiểm tra trạng thái cũ.
+                        if (!initialPageUrl.isNullOrEmpty()) {
                             val mediaMetadata = MediaMetadata.Builder().setTitle(initialVideoTitle).build()
                             val mediaItem = MediaItem.Builder()
                                 .setMediaId(initialPageUrl)
@@ -130,10 +137,11 @@ class VideoPlayerActivity : ComponentActivity() {
                             connectedController.setMediaItem(mediaItem)
                             connectedController.playWhenReady = true
                             connectedController.prepare()
-                            updateUiFromController(connectedController)
-                        } else {
-                            updateUiFromController(connectedController)
                         }
+
+                        // Cập nhật UI với thông tin từ controller sau khi có thể đã được cập nhật
+                        updateUiFromController(connectedController)
+
 
                     }, ContextCompat.getMainExecutor(this@VideoPlayerActivity))
 
@@ -227,9 +235,4 @@ class VideoPlayerActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-    }
-
 }

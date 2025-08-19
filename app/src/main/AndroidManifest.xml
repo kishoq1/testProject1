@@ -37,6 +37,7 @@
             android:launchMode="singleTop"
             android:supportsPictureInPicture="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:parentActivityName=".ui.MainActivity"
             android:resizeableActivity="true" />
 
         <service

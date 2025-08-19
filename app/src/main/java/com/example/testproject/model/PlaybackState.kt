@@ -18,7 +18,7 @@ object PlaybackState {
         )
         currentVideoUrl = url
     }
-    
+
     fun clear() {
         _currentVideo.value = null
         currentVideoUrl = null
